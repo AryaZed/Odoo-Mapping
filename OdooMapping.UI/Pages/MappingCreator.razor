@@ -1,0 +1,462 @@
+@page "/mapping-creator"
+@using OdooMapping.Domain.Models
+@using OdooMapping.UI.Services
+@using Microsoft.Data.SqlClient
+@using Npgsql
+@inject DatabaseService DatabaseService
+@inject MappingService MappingService
+@inject NavigationManager NavManager
+
+<h1>Database Mapping Creator</h1>
+
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Source SQL Server Database</h5>
+                </div>
+                <div class="card-body">
+                    <div class="form-group mb-3">
+                        <label>Connection String:</label>
+                        <input type="text" class="form-control" @bind="SqlServerConnectionString" placeholder="Server=localhost;Database=mydb;User Id=user;Password=pass;TrustServerCertificate=True;" />
+                        <button class="btn btn-sm btn-secondary mt-2" @onclick="TestSqlServerConnection">Test Connection</button>
+                        @if (SqlServerConnectionTested)
+                        {
+                            <span class="@(SqlServerConnectionValid ? "text-success" : "text-danger") ms-2">
+                                @(SqlServerConnectionValid ? "Connection successful!" : "Connection failed!")
+                            </span>
+                        }
+                    </div>
+
+                    @if (SqlServerConnectionValid)
+                    {
+                        <div class="form-group mb-3">
+                            <label>Database:</label>
+                            <select class="form-control" @bind="SelectedSqlServerDatabase" @bind:after="LoadSqlServerTables">
+                                <option value="">-- Select Database --</option>
+                                @foreach (var db in SqlServerDatabases)
+                                {
+                                    <option value="@db">@db</option>
+                                }
+                            </select>
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(SelectedSqlServerDatabase))
+                        {
+                            <div class="form-group mb-3">
+                                <label>Table:</label>
+                                <select class="form-control" @bind="SelectedSqlServerTable" @bind:after="LoadSqlServerColumns">
+                                    <option value="">-- Select Table --</option>
+                                    @foreach (var table in SqlServerTables)
+                                    {
+                                        <option value="@table">@table</option>
+                                    }
+                                </select>
+                            </div>
+
+                            @if (!string.IsNullOrEmpty(SelectedSqlServerTable))
+                            {
+                                <div class="form-group">
+                                    <label>Columns:</label>
+                                    <div style="max-height: 300px; overflow-y: auto;">
+                                        @foreach (var column in SqlServerColumns)
+                                        {
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" @onchange="e => ToggleSqlServerColumn(column, e.Value != null && (bool)e.Value)" />
+                                                <label class="form-check-label">@column</label>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Target Odoo PostgreSQL Database</h5>
+                </div>
+                <div class="card-body">
+                    <div class="form-group mb-3">
+                        <label>Connection String:</label>
+                        <input type="text" class="form-control" @bind="PostgresConnectionString" placeholder="Host=localhost;Port=5432;Database=odoo;Username=odoo;Password=odoo;" />
+                        <button class="btn btn-sm btn-secondary mt-2" @onclick="TestPostgresConnection">Test Connection</button>
+                        @if (PostgresConnectionTested)
+                        {
+                            <span class="@(PostgresConnectionValid ? "text-success" : "text-danger") ms-2">
+                                @(PostgresConnectionValid ? "Connection successful!" : "Connection failed!")
+                            </span>
+                        }
+                    </div>
+
+                    @if (PostgresConnectionValid)
+                    {
+                        <div class="form-group mb-3">
+                            <label>Database:</label>
+                            <select class="form-control" @bind="SelectedPostgresDatabase" @bind:after="LoadPostgresTables">
+                                <option value="">-- Select Database --</option>
+                                @foreach (var db in PostgresDatabases)
+                                {
+                                    <option value="@db">@db</option>
+                                }
+                            </select>
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(SelectedPostgresDatabase))
+                        {
+                            <div class="form-group mb-3">
+                                <label>Table:</label>
+                                <select class="form-control" @bind="SelectedPostgresTable" @bind:after="LoadPostgresColumns">
+                                    <option value="">-- Select Table --</option>
+                                    @foreach (var table in PostgresTables)
+                                    {
+                                        <option value="@table">@table</option>
+                                    }
+                                </select>
+                            </div>
+
+                            @if (!string.IsNullOrEmpty(SelectedPostgresTable))
+                            {
+                                <div class="form-group">
+                                    <label>Columns:</label>
+                                    <div style="max-height: 300px; overflow-y: auto;">
+                                        @foreach (var column in PostgresColumns)
+                                        {
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" @onchange="e => TogglePostgresColumn(column, e.Value != null && (bool)e.Value)" />
+                                                <label class="form-check-label">@column</label>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (SelectedSqlServerColumns.Any() && SelectedPostgresColumns.Any())
+    {
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Field Mappings</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-group mb-3">
+                            <label>Mapping Name:</label>
+                            <input type="text" class="form-control" @bind="MappingName" placeholder="Enter a name for this mapping" />
+                        </div>
+
+                        <div class="form-group mb-3">
+                            <label>Description:</label>
+                            <textarea class="form-control" @bind="MappingDescription" placeholder="Enter a description"></textarea>
+                        </div>
+
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Source Field</th>
+                                    <th>Target Field</th>
+                                    <th>Transformation</th>
+                                    <th>Default Value</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var mapping in FieldMappings)
+                                {
+                                    <tr>
+                                        <td>
+                                            <select class="form-control" @bind="mapping.SourceField">
+                                                <option value="">-- Select Source Field --</option>
+                                                @foreach (var field in SelectedSqlServerColumns)
+                                                {
+                                                    <option value="@field">@field</option>
+                                                }
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <select class="form-control" @bind="mapping.TargetField">
+                                                <option value="">-- Select Target Field --</option>
+                                                @foreach (var field in SelectedPostgresColumns)
+                                                {
+                                                    <option value="@field">@field</option>
+                                                }
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <select class="form-control" @bind="mapping.TransformationExpression">
+                                                <option value="">None</option>
+                                                <option value="uppercase">UPPERCASE</option>
+                                                <option value="lowercase">lowercase</option>
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <input type="text" class="form-control" @bind="mapping.DefaultValue" placeholder="Default value" />
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-sm btn-danger" @onclick="() => RemoveFieldMapping(mapping)">Remove</button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+
+                        <button class="btn btn-primary" @onclick="AddFieldMapping">Add Mapping</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Execution Settings</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" @bind="TruncateTargetBeforeInsert" id="truncate-target" />
+                            <label class="form-check-label" for="truncate-target">
+                                Truncate target table before insert
+                            </label>
+                        </div>
+
+                        <div class="form-group mb-3">
+                            <label>Batch Size:</label>
+                            <input type="number" class="form-control" @bind="BatchSize" min="1" max="10000" />
+                        </div>
+
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" @bind="IsActive" id="is-active" />
+                            <label class="form-check-label" for="is-active">
+                                Activate this mapping
+                            </label>
+                        </div>
+
+                        <button class="btn btn-success" @onclick="SaveMapping">Save Mapping</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    // SQL Server variables
+    private string SqlServerConnectionString { get; set; } = "";
+    private bool SqlServerConnectionTested { get; set; }
+    private bool SqlServerConnectionValid { get; set; }
+    private List<string> SqlServerDatabases { get; set; } = new List<string>();
+    private string SelectedSqlServerDatabase { get; set; } = "";
+    private List<string> SqlServerTables { get; set; } = new List<string>();
+    private string SelectedSqlServerTable { get; set; } = "";
+    private List<string> SqlServerColumns { get; set; } = new List<string>();
+    private List<string> SelectedSqlServerColumns { get; set; } = new List<string>();
+
+    // PostgreSQL variables
+    private string PostgresConnectionString { get; set; } = "";
+    private bool PostgresConnectionTested { get; set; }
+    private bool PostgresConnectionValid { get; set; }
+    private List<string> PostgresDatabases { get; set; } = new List<string>();
+    private string SelectedPostgresDatabase { get; set; } = "";
+    private List<string> PostgresTables { get; set; } = new List<string>();
+    private string SelectedPostgresTable { get; set; } = "";
+    private List<string> PostgresColumns { get; set; } = new List<string>();
+    private List<string> SelectedPostgresColumns { get; set; } = new List<string>();
+
+    // Mapping variables
+    private string MappingName { get; set; } = "";
+    private string MappingDescription { get; set; } = "";
+    private bool TruncateTargetBeforeInsert { get; set; } = false;
+    private int BatchSize { get; set; } = 100;
+    private bool IsActive { get; set; } = true;
+    private List<FieldMapping> FieldMappings { get; set; } = new List<FieldMapping>();
+
+    private async Task TestSqlServerConnection()
+    {
+        try
+        {
+            SqlServerConnectionValid = await DatabaseService.TestSqlServerConnectionAsync(SqlServerConnectionString);
+            SqlServerConnectionTested = true;
+
+            if (SqlServerConnectionValid)
+            {
+                SqlServerDatabases = await DatabaseService.GetSqlServerDatabasesAsync(SqlServerConnectionString);
+            }
+        }
+        catch
+        {
+            SqlServerConnectionValid = false;
+            SqlServerConnectionTested = true;
+        }
+    }
+
+    private async Task TestPostgresConnection()
+    {
+        try
+        {
+            PostgresConnectionValid = await DatabaseService.TestPostgresConnectionAsync(PostgresConnectionString);
+            PostgresConnectionTested = true;
+
+            if (PostgresConnectionValid)
+            {
+                PostgresDatabases = await DatabaseService.GetPostgresDatabasesAsync(PostgresConnectionString);
+            }
+        }
+        catch
+        {
+            PostgresConnectionValid = false;
+            PostgresConnectionTested = true;
+        }
+    }
+
+    private async Task LoadSqlServerTables()
+    {
+        if (!string.IsNullOrEmpty(SelectedSqlServerDatabase))
+        {
+            var builder = new SqlConnectionStringBuilder(SqlServerConnectionString);
+            builder.InitialCatalog = SelectedSqlServerDatabase;
+
+            SqlServerTables = await DatabaseService.GetSqlServerTablesAsync(builder.ConnectionString);
+            SelectedSqlServerTable = "";
+            SqlServerColumns.Clear();
+            SelectedSqlServerColumns.Clear();
+        }
+    }
+
+    private async Task LoadPostgresTables()
+    {
+        if (!string.IsNullOrEmpty(SelectedPostgresDatabase))
+        {
+            var builder = new NpgsqlConnectionStringBuilder(PostgresConnectionString);
+            builder.Database = SelectedPostgresDatabase;
+
+            PostgresTables = await DatabaseService.GetPostgresTablesAsync(builder.ConnectionString);
+            SelectedPostgresTable = "";
+            PostgresColumns.Clear();
+            SelectedPostgresColumns.Clear();
+        }
+    }
+
+    private async Task LoadSqlServerColumns()
+    {
+        if (!string.IsNullOrEmpty(SelectedSqlServerTable))
+        {
+            var builder = new SqlConnectionStringBuilder(SqlServerConnectionString);
+            builder.InitialCatalog = SelectedSqlServerDatabase;
+
+            SqlServerColumns = await DatabaseService.GetSqlServerColumnsAsync(builder.ConnectionString, SelectedSqlServerTable);
+            SelectedSqlServerColumns.Clear();
+        }
+    }
+
+    private async Task LoadPostgresColumns()
+    {
+        if (!string.IsNullOrEmpty(SelectedPostgresTable))
+        {
+            var builder = new NpgsqlConnectionStringBuilder(PostgresConnectionString);
+            builder.Database = SelectedPostgresDatabase;
+
+            PostgresColumns = await DatabaseService.GetPostgresColumnsAsync(builder.ConnectionString, SelectedPostgresTable);
+            SelectedPostgresColumns.Clear();
+        }
+    }
+
+    private void ToggleSqlServerColumn(string column, bool selected)
+    {
+        if (selected && !SelectedSqlServerColumns.Contains(column))
+        {
+            SelectedSqlServerColumns.Add(column);
+        }
+        else if (!selected && SelectedSqlServerColumns.Contains(column))
+        {
+            SelectedSqlServerColumns.Remove(column);
+        }
+    }
+
+    private void TogglePostgresColumn(string column, bool selected)
+    {
+        if (selected && !SelectedPostgresColumns.Contains(column))
+        {
+            SelectedPostgresColumns.Add(column);
+        }
+        else if (!selected && SelectedPostgresColumns.Contains(column))
+        {
+            SelectedPostgresColumns.Remove(column);
+        }
+    }
+
+    private void AddFieldMapping()
+    {
+        FieldMappings.Add(new FieldMapping
+        {
+            RequiresTransformation = false
+        });
+    }
+
+    private void RemoveFieldMapping(FieldMapping mapping)
+    {
+        FieldMappings.Remove(mapping);
+    }
+
+    private async Task SaveMapping()
+    {
+        // Build connection strings with selected databases
+        var sqlServerBuilder = new SqlConnectionStringBuilder(SqlServerConnectionString);
+        sqlServerBuilder.InitialCatalog = SelectedSqlServerDatabase;
+        
+        var postgresBuilder = new NpgsqlConnectionStringBuilder(PostgresConnectionString);
+        postgresBuilder.Database = SelectedPostgresDatabase;
+
+        // Create mapping definition
+        var mappingDefinition = new MappingDefinition
+        {
+            Name = MappingName,
+            Description = MappingDescription,
+            IsActive = IsActive,
+            CreatedAt = DateTime.Now,
+            
+            // Source configuration
+            SourceConnectionString = sqlServerBuilder.ConnectionString,
+            SourceQuery = $"SELECT {string.Join(", ", SelectedSqlServerColumns)} FROM {SelectedSqlServerTable}",
+            
+            // Target configuration
+            TargetConnectionString = postgresBuilder.ConnectionString,
+            TargetTable = SelectedPostgresTable,
+            
+            // Execution settings
+            TruncateTargetBeforeInsert = TruncateTargetBeforeInsert,
+            BatchSize = BatchSize,
+            
+            // Field mappings - update the field mappings to include SourceFieldType and TargetFieldType
+            FieldMappings = FieldMappings.Select(m =>
+            {
+                m.RequiresTransformation = !string.IsNullOrEmpty(m.TransformationExpression);
+                m.SourceFieldType = "string"; // Set default for simplicity, can be enhanced
+                m.TargetFieldType = "string"; // Set default for simplicity, can be enhanced
+                return m;
+            }).ToList()
+        };
+
+        try
+        {
+            await MappingService.CreateMappingAsync(mappingDefinition);
+            NavManager.NavigateTo("/mappings");
+        }
+        catch (Exception ex)
+        {
+            // Handle error - in real app, show error to user
+            Console.WriteLine(ex.Message);
+        }
+    }
+} 
