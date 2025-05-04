@@ -1,0 +1,736 @@
+@page "/scheduled-mappings"
+@using OdooMapping.Domain.Models
+@using OdooMapping.UI.Services
+@inject MappingService MappingService
+@inject NavigationManager NavManager
+
+<div class="container-fluid">
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h3><i class="bi bi-clock-history me-2"></i>Scheduled Mappings</h3>
+                <div>
+                    <button class="btn btn-primary" @onclick="CreateNewSchedule">
+                        <i class="bi bi-plus-lg me-2"></i>Schedule New Mapping
+                    </button>
+                </div>
+            </div>
+            <hr />
+            <p class="lead">Set up automatic recurring data transfers between your databases.</p>
+        </div>
+    </div>
+
+    @if (IsLoading)
+    {
+        <div class="row">
+            <div class="col-12 text-center p-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-3">Loading schedules...</p>
+            </div>
+        </div>
+    }
+    else if (!ScheduledMappingsList.Any())
+    {
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-body text-center py-5">
+                        <i class="bi bi-calendar-x text-muted" style="font-size: 3rem;"></i>
+                        <h4 class="mt-3">No Scheduled Mappings</h4>
+                        <p class="text-muted mb-4">You haven't set up any scheduled data transfers yet.</p>
+                        <button class="btn btn-primary" @onclick="CreateNewSchedule">
+                            <i class="bi bi-plus-lg me-2"></i>Schedule Your First Mapping
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-light">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Active Schedules</h5>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="show-completed" @bind="ShowCompleted">
+                                <label class="form-check-label" for="show-completed">Show Completed Runs</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Schedule</th>
+                                        <th>Next Run</th>
+                                        <th>Last Run</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var mapping in ScheduledMappingsList)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <strong>@mapping.Name</strong>
+                                                @if (!string.IsNullOrEmpty(mapping.Description))
+                                                {
+                                                    <div class="small text-muted">@mapping.Description</div>
+                                                }
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-secondary">@GetScheduleDescription(mapping.Schedule)</span>
+                                            </td>
+                                            <td>
+                                                @if (mapping.NextScheduledRun.HasValue)
+                                                {
+                                                    <span class="@(mapping.NextScheduledRun.Value < DateTime.Now ? "text-danger" : "")">
+                                                        @mapping.NextScheduledRun.Value.ToString("g")
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">Not scheduled</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (mapping.LastExecutedAt != default)
+                                                {
+                                                    <span>@mapping.LastExecutedAt.ToString("g")</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">Never</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (mapping.LastExecutedAt != default)
+                                                {
+                                                    if (mapping.LastExecutionSuccessful)
+                                                    {
+                                                        <span class="badge bg-success">Success</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="badge bg-danger">Failed</span>
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-secondary">Pending</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                <div class="btn-group">
+                                                    <button class="btn btn-sm btn-outline-primary" @onclick="() => RunNow(mapping)">
+                                                        <i class="bi bi-play-fill me-1"></i>Run Now
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => EditSchedule(mapping)">
+                                                        <i class="bi bi-pencil me-1"></i>Edit
+                                                    </button>
+                                                    <button class="btn btn-sm @(mapping.IsActive ? "btn-outline-warning" : "btn-outline-success")" @onclick="() => ToggleActive(mapping)">
+                                                        @if (mapping.IsActive)
+                                                        {
+                                                            <i class="bi bi-pause-fill me-1"></i>
+                                                            <span>Pause</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <i class="bi bi-play-fill me-1"></i>
+                                                            <span>Resume</span>
+                                                        }
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteSchedule(mapping)">
+                                                        <i class="bi bi-trash me-1"></i>Delete
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (ShowHistorySection)
+        {
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-light">
+                            <h5 class="mb-0">Execution History</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Mapping Name</th>
+                                            <th>Execution Time</th>
+                                            <th>Duration</th>
+                                            <th>Records</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var execution in MappingExecutions)
+                                        {
+                                            <tr>
+                                                <td>@execution.MappingName</td>
+                                                <td>@execution.StartTime.ToString("g")</td>
+                                                <td>@FormatDuration(execution.Duration)</td>
+                                                <td>@execution.RecordsProcessed / @execution.TotalRecords</td>
+                                                <td>
+                                                    @if (execution.Success)
+                                                    {
+                                                        <span class="badge bg-success">Success</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="badge bg-danger">Failed</span>
+                                                    }
+                                                </td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-primary" @onclick="() => ViewExecutionDetails(execution)">
+                                                        <i class="bi bi-eye me-1"></i>Details
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+
+    @if (ShowScheduleModal)
+    {
+        <div class="modal fade show" style="display: block; background-color: rgba(0,0,0,0.5);" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">@(EditingSchedule == null ? "Create New Schedule" : $"Edit Schedule: {EditingSchedule.Name}")</h5>
+                        <button type="button" class="btn-close" @onclick="CloseScheduleModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Select a Mapping:</label>
+                            <select class="form-select" @bind="SelectedMappingId">
+                                <option value="">-- Select a Mapping --</option>
+                                @foreach (var mapping in AvailableMappings)
+                                {
+                                    <option value="@mapping.Id">@mapping.Name</option>
+                                }
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Schedule Type:</label>
+                            <select class="form-select" @bind="ScheduleType">
+                                <option value="once">Run Once</option>
+                                <option value="hourly">Hourly</option>
+                                <option value="daily">Daily</option>
+                                <option value="weekly">Weekly</option>
+                                <option value="monthly">Monthly</option>
+                                <option value="custom">Custom (Advanced)</option>
+                            </select>
+                        </div>
+                        
+                        @if (ScheduleType == "once")
+                        {
+                            <div class="mb-3">
+                                <label class="form-label">Date and Time:</label>
+                                <input type="datetime-local" class="form-control" @bind="ScheduleDate" />
+                            </div>
+                        }
+                        else if (ScheduleType == "hourly")
+                        {
+                            <div class="mb-3">
+                                <label class="form-label">Run at minute:</label>
+                                <input type="number" class="form-control" min="0" max="59" @bind="ScheduleMinute" />
+                            </div>
+                        }
+                        else if (ScheduleType == "daily")
+                        {
+                            <div class="mb-3">
+                                <label class="form-label">Time:</label>
+                                <input type="time" class="form-control" @bind="ScheduleTime" />
+                            </div>
+                        }
+                        else if (ScheduleType == "weekly")
+                        {
+                            <div class="mb-3">
+                                <label class="form-label">Day of Week:</label>
+                                <select class="form-select" @bind="ScheduleDay">
+                                    <option value="1">Monday</option>
+                                    <option value="2">Tuesday</option>
+                                    <option value="3">Wednesday</option>
+                                    <option value="4">Thursday</option>
+                                    <option value="5">Friday</option>
+                                    <option value="6">Saturday</option>
+                                    <option value="0">Sunday</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Time:</label>
+                                <input type="time" class="form-control" @bind="ScheduleTime" />
+                            </div>
+                        }
+                        else if (ScheduleType == "monthly")
+                        {
+                            <div class="mb-3">
+                                <label class="form-label">Day of Month:</label>
+                                <input type="number" class="form-control" min="1" max="31" @bind="ScheduleDayOfMonth" />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Time:</label>
+                                <input type="time" class="form-control" @bind="ScheduleTime" />
+                            </div>
+                        }
+                        else if (ScheduleType == "custom")
+                        {
+                            <div class="mb-3">
+                                <label class="form-label">Cron Expression:</label>
+                                <input type="text" class="form-control" @bind="CronExpression" placeholder="* * * * *" />
+                                <div class="form-text">Use cron format: minute hour day-of-month month day-of-week</div>
+                            </div>
+                        }
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CloseScheduleModal">Cancel</button>
+                        <button type="button" class="btn btn-primary" @onclick="SaveSchedule">Save Schedule</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (ShowDeleteConfirmation)
+    {
+        <div class="modal fade show" style="display: block; background-color: rgba(0,0,0,0.5);" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Delete Schedule</h5>
+                        <button type="button" class="btn-close" @onclick="CancelDelete"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Are you sure you want to delete the schedule for <strong>"@MappingToDelete?.Name"</strong>?</p>
+                        <p class="text-danger">This action cannot be undone.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CancelDelete">Cancel</button>
+                        <button type="button" class="btn btn-danger" @onclick="ConfirmDelete">Delete</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool IsLoading { get; set; } = true;
+    private List<MappingDefinition> ScheduledMappingsList { get; set; } = new List<MappingDefinition>();
+    private List<MappingDefinition> AvailableMappings { get; set; } = new List<MappingDefinition>();
+    private List<MappingExecution> MappingExecutions { get; set; } = new List<MappingExecution>();
+    private bool ShowCompleted { get; set; }
+    private bool ShowHistorySection => ShowCompleted && MappingExecutions.Any();
+    
+    // Modal state
+    private bool ShowScheduleModal { get; set; }
+    private bool ShowDeleteConfirmation { get; set; }
+    private MappingDefinition EditingSchedule { get; set; }
+    private MappingDefinition MappingToDelete { get; set; }
+    
+    // Schedule editor
+    private Guid SelectedMappingId { get; set; }
+    private string ScheduleType { get; set; } = "daily";
+    private DateTime ScheduleDate { get; set; } = DateTime.Now.AddDays(1);
+    private TimeOnly ScheduleTime { get; set; } = new TimeOnly(9, 0); // 9:00 AM
+    private int ScheduleMinute { get; set; } = 0;
+    private int ScheduleDay { get; set; } = 1; // Monday
+    private int ScheduleDayOfMonth { get; set; } = 1;
+    private string CronExpression { get; set; } = "0 9 * * *"; // Daily at 9 AM
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        IsLoading = true;
+        
+        try
+        {
+            var allMappings = await MappingService.GetMappingsAsync();
+            ScheduledMappingsList = allMappings.Where(m => m.IsScheduled).ToList();
+            AvailableMappings = allMappings;
+            
+            if (ShowCompleted)
+            {
+                MappingExecutions = await MappingService.GetMappingExecutionsAsync();
+            }
+        }
+        catch
+        {
+            // Handle error
+            ScheduledMappingsList = new List<MappingDefinition>();
+            AvailableMappings = new List<MappingDefinition>();
+            MappingExecutions = new List<MappingExecution>();
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private void CreateNewSchedule()
+    {
+        EditingSchedule = null;
+        SelectedMappingId = Guid.Empty;
+        ScheduleType = "daily";
+        ScheduleDate = DateTime.Now.AddDays(1);
+        ScheduleTime = new TimeOnly(9, 0);
+        ScheduleMinute = 0;
+        ScheduleDay = 1;
+        ScheduleDayOfMonth = 1;
+        CronExpression = "0 9 * * *";
+        
+        ShowScheduleModal = true;
+    }
+
+    private void EditSchedule(MappingDefinition mapping)
+    {
+        EditingSchedule = mapping;
+        SelectedMappingId = mapping.Id;
+        
+        // Parse the schedule
+        if (mapping.Schedule.StartsWith("ONCE:"))
+        {
+            ScheduleType = "once";
+            if (DateTime.TryParse(mapping.Schedule.Replace("ONCE:", ""), out var date))
+            {
+                ScheduleDate = date;
+            }
+        }
+        else if (mapping.Schedule.StartsWith("HOURLY:"))
+        {
+            ScheduleType = "hourly";
+            if (int.TryParse(mapping.Schedule.Replace("HOURLY:", ""), out var minute))
+            {
+                ScheduleMinute = minute;
+            }
+        }
+        else if (mapping.Schedule.StartsWith("DAILY:"))
+        {
+            ScheduleType = "daily";
+            if (TimeOnly.TryParse(mapping.Schedule.Replace("DAILY:", ""), out var time))
+            {
+                ScheduleTime = time;
+            }
+        }
+        else if (mapping.Schedule.StartsWith("WEEKLY:"))
+        {
+            ScheduleType = "weekly";
+            var parts = mapping.Schedule.Replace("WEEKLY:", "").Split(':');
+            if (parts.Length == 2)
+            {
+                if (int.TryParse(parts[0], out var day))
+                {
+                    ScheduleDay = day;
+                }
+                if (TimeOnly.TryParse(parts[1], out var time))
+                {
+                    ScheduleTime = time;
+                }
+            }
+        }
+        else if (mapping.Schedule.StartsWith("MONTHLY:"))
+        {
+            ScheduleType = "monthly";
+            var parts = mapping.Schedule.Replace("MONTHLY:", "").Split(':');
+            if (parts.Length == 2)
+            {
+                if (int.TryParse(parts[0], out var day))
+                {
+                    ScheduleDayOfMonth = day;
+                }
+                if (TimeOnly.TryParse(parts[1], out var time))
+                {
+                    ScheduleTime = time;
+                }
+            }
+        }
+        else
+        {
+            ScheduleType = "custom";
+            CronExpression = mapping.Schedule;
+        }
+        
+        ShowScheduleModal = true;
+    }
+
+    private async Task SaveSchedule()
+    {
+        if (SelectedMappingId == Guid.Empty)
+        {
+            // Validation error
+            return;
+        }
+        
+        var mapping = EditingSchedule ?? AvailableMappings.FirstOrDefault(m => m.Id == SelectedMappingId);
+        if (mapping == null)
+        {
+            return;
+        }
+        
+        // Generate schedule string
+        string schedule;
+        DateTime? nextRun = null;
+        
+        switch (ScheduleType)
+        {
+            case "once":
+                schedule = $"ONCE:{ScheduleDate:yyyy-MM-dd HH:mm:ss}";
+                nextRun = ScheduleDate;
+                break;
+            case "hourly":
+                schedule = $"HOURLY:{ScheduleMinute}";
+                nextRun = GetNextHourlyRun(ScheduleMinute);
+                break;
+            case "daily":
+                schedule = $"DAILY:{ScheduleTime}";
+                nextRun = GetNextDailyRun(ScheduleTime);
+                break;
+            case "weekly":
+                schedule = $"WEEKLY:{ScheduleDay}:{ScheduleTime}";
+                nextRun = GetNextWeeklyRun(ScheduleDay, ScheduleTime);
+                break;
+            case "monthly":
+                schedule = $"MONTHLY:{ScheduleDayOfMonth}:{ScheduleTime}";
+                nextRun = GetNextMonthlyRun(ScheduleDayOfMonth, ScheduleTime);
+                break;
+            default:
+                schedule = CronExpression;
+                // Calculate next run based on cron expression would require a cron parser
+                nextRun = DateTime.Now.AddHours(1); // Simplified for example
+                break;
+        }
+        
+        mapping.IsScheduled = true;
+        mapping.Schedule = schedule;
+        mapping.NextScheduledRun = nextRun;
+        mapping.IsActive = true;
+        
+        await MappingService.UpdateMappingAsync(mapping);
+        await LoadData();
+        
+        ShowScheduleModal = false;
+    }
+
+    private DateTime GetNextHourlyRun(int minute)
+    {
+        var now = DateTime.Now;
+        var next = new DateTime(now.Year, now.Month, now.Day, now.Hour, minute, 0);
+        if (next <= now)
+        {
+            next = next.AddHours(1);
+        }
+        return next;
+    }
+
+    private DateTime GetNextDailyRun(TimeOnly time)
+    {
+        var now = DateTime.Now;
+        var next = new DateTime(now.Year, now.Month, now.Day, time.Hour, time.Minute, 0);
+        if (next <= now)
+        {
+            next = next.AddDays(1);
+        }
+        return next;
+    }
+
+    private DateTime GetNextWeeklyRun(int dayOfWeek, TimeOnly time)
+    {
+        var now = DateTime.Now;
+        var daysUntilNextRun = (7 + dayOfWeek - (int)now.DayOfWeek) % 7;
+        if (daysUntilNextRun == 0 && now.TimeOfDay >= time.ToTimeSpan())
+        {
+            daysUntilNextRun = 7;
+        }
+        var next = new DateTime(now.Year, now.Month, now.Day, time.Hour, time.Minute, 0).AddDays(daysUntilNextRun);
+        return next;
+    }
+
+    private DateTime GetNextMonthlyRun(int dayOfMonth, TimeOnly time)
+    {
+        var now = DateTime.Now;
+        var next = new DateTime(now.Year, now.Month, dayOfMonth, time.Hour, time.Minute, 0);
+        if (next <= now || dayOfMonth > DateTime.DaysInMonth(now.Year, now.Month))
+        {
+            var nextMonth = now.AddMonths(1);
+            var maxDays = DateTime.DaysInMonth(nextMonth.Year, nextMonth.Month);
+            next = new DateTime(nextMonth.Year, nextMonth.Month, Math.Min(dayOfMonth, maxDays), time.Hour, time.Minute, 0);
+        }
+        return next;
+    }
+
+    private void CloseScheduleModal()
+    {
+        ShowScheduleModal = false;
+        EditingSchedule = null;
+    }
+
+    private async Task RunNow(MappingDefinition mapping)
+    {
+        // Start execution immediately
+        await MappingService.ExecuteMappingAsync(mapping.Id);
+        await LoadData();
+    }
+
+    private async Task ToggleActive(MappingDefinition mapping)
+    {
+        mapping.IsActive = !mapping.IsActive;
+        await MappingService.UpdateMappingAsync(mapping);
+        await LoadData();
+    }
+
+    private void DeleteSchedule(MappingDefinition mapping)
+    {
+        MappingToDelete = mapping;
+        ShowDeleteConfirmation = true;
+    }
+
+    private void CancelDelete()
+    {
+        ShowDeleteConfirmation = false;
+        MappingToDelete = null;
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (MappingToDelete != null)
+        {
+            MappingToDelete.IsScheduled = false;
+            MappingToDelete.Schedule = null;
+            MappingToDelete.NextScheduledRun = null;
+            
+            await MappingService.UpdateMappingAsync(MappingToDelete);
+            await LoadData();
+        }
+        
+        ShowDeleteConfirmation = false;
+        MappingToDelete = null;
+    }
+
+    private void ViewExecutionDetails(MappingExecution execution)
+    {
+        NavManager.NavigateTo($"/execution-details/{execution.Id}");
+    }
+
+    private string GetScheduleDescription(string schedule)
+    {
+        if (string.IsNullOrEmpty(schedule))
+        {
+            return "Not scheduled";
+        }
+        
+        if (schedule.StartsWith("ONCE:"))
+        {
+            if (DateTime.TryParse(schedule.Replace("ONCE:", ""), out var date))
+            {
+                return $"Once at {date:g}";
+            }
+        }
+        else if (schedule.StartsWith("HOURLY:"))
+        {
+            if (int.TryParse(schedule.Replace("HOURLY:", ""), out var minute))
+            {
+                return $"Every hour at {minute} minutes";
+            }
+        }
+        else if (schedule.StartsWith("DAILY:"))
+        {
+            if (TimeOnly.TryParse(schedule.Replace("DAILY:", ""), out var time))
+            {
+                return $"Daily at {time.Hour:D2}:{time.Minute:D2}";
+            }
+        }
+        else if (schedule.StartsWith("WEEKLY:"))
+        {
+            var parts = schedule.Replace("WEEKLY:", "").Split(':');
+            if (parts.Length == 2)
+            {
+                if (int.TryParse(parts[0], out var day) && TimeOnly.TryParse(parts[1], out var time))
+                {
+                    var dayName = day switch
+                    {
+                        0 => "Sunday",
+                        1 => "Monday",
+                        2 => "Tuesday",
+                        3 => "Wednesday",
+                        4 => "Thursday",
+                        5 => "Friday",
+                        6 => "Saturday",
+                        _ => "Unknown"
+                    };
+                    return $"Weekly on {dayName} at {time.Hour:D2}:{time.Minute:D2}";
+                }
+            }
+        }
+        else if (schedule.StartsWith("MONTHLY:"))
+        {
+            var parts = schedule.Replace("MONTHLY:", "").Split(':');
+            if (parts.Length == 2)
+            {
+                if (int.TryParse(parts[0], out var day) && TimeOnly.TryParse(parts[1], out var time))
+                {
+                    string suffix = day switch
+                    {
+                        1 or 21 or 31 => "st",
+                        2 or 22 => "nd",
+                        3 or 23 => "rd",
+                        _ => "th"
+                    };
+                    return $"Monthly on the {day}{suffix} at {time.Hour:D2}:{time.Minute:D2}";
+                }
+            }
+        }
+        
+        // For custom cron expressions
+        return schedule;
+    }
+
+    private string FormatDuration(TimeSpan duration)
+    {
+        if (duration.TotalHours >= 1)
+        {
+            return $"{duration.Hours}h {duration.Minutes}m {duration.Seconds}s";
+        }
+        else if (duration.TotalMinutes >= 1)
+        {
+            return $"{duration.Minutes}m {duration.Seconds}s";
+        }
+        else
+        {
+            return $"{duration.Seconds}.{duration.Milliseconds}s";
+        }
+    }
+} 

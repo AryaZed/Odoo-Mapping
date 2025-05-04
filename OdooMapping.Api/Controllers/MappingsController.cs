@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using OdooMapping.Application.Interfaces;
 using OdooMapping.Domain.Models;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -30,7 +31,7 @@ namespace OdooMapping.Api.Controllers
         
         // GET: api/mappings/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<MappingDefinition>> GetMapping(int id)
+        public async Task<ActionResult<MappingDefinition>> GetMapping(Guid id)
         {
             var mapping = await _repository.GetMappingWithFieldsAsync(id);
             
@@ -50,7 +51,7 @@ namespace OdooMapping.Api.Controllers
         
         // PUT: api/mappings/5
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateMapping(int id, MappingDefinition mapping)
+        public async Task<IActionResult> UpdateMapping(Guid id, MappingDefinition mapping)
         {
             if (id != mapping.Id)
                 return BadRequest();
@@ -65,7 +66,7 @@ namespace OdooMapping.Api.Controllers
         
         // DELETE: api/mappings/5
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteMapping(int id)
+        public async Task<IActionResult> DeleteMapping(Guid id)
         {
             var result = await _repository.DeleteAsync(id);
             
@@ -77,7 +78,7 @@ namespace OdooMapping.Api.Controllers
         
         // POST: api/mappings/5/execute
         [HttpPost("{id}/execute")]
-        public async Task<IActionResult> ExecuteMapping(int id)
+        public async Task<IActionResult> ExecuteMapping(Guid id)
         {
             var result = await _mappingService.ExecuteMappingAsync(id);
             
@@ -89,7 +90,7 @@ namespace OdooMapping.Api.Controllers
         
         // POST: api/mappings/5/validate
         [HttpPost("{id}/validate")]
-        public async Task<IActionResult> ValidateMapping(int id)
+        public async Task<IActionResult> ValidateMapping(Guid id)
         {
             var result = await _mappingService.ValidateMappingAsync(id);
             

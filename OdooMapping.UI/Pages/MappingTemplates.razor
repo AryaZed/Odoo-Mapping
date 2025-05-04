@@ -1,0 +1,254 @@
+@page "/mapping-templates"
+@using OdooMapping.Domain.Models
+@using OdooMapping.UI.Services
+@inject MappingService MappingService
+@inject NavigationManager NavManager
+
+<div class="container-fluid">
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h3><i class="bi bi-folder2-open me-2"></i>Mapping Templates</h3>
+                <div>
+                    <button class="btn btn-primary" @onclick="CreateNewTemplate">
+                        <i class="bi bi-plus-lg me-2"></i>Create New Template
+                    </button>
+                </div>
+            </div>
+            <hr />
+            <p class="lead">Save and reuse common mapping configurations to improve efficiency and consistency.</p>
+        </div>
+    </div>
+
+    @if (IsLoading)
+    {
+        <div class="row">
+            <div class="col-12 text-center p-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-3">Loading templates...</p>
+            </div>
+        </div>
+    }
+    else if (!Templates.Any())
+    {
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-body text-center py-5">
+                        <i class="bi bi-folder text-muted" style="font-size: 3rem;"></i>
+                        <h4 class="mt-3">No Templates Found</h4>
+                        <p class="text-muted mb-4">You haven't created any mapping templates yet.</p>
+                        <button class="btn btn-primary" @onclick="CreateNewTemplate">
+                            <i class="bi bi-plus-lg me-2"></i>Create Your First Template
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            <div class="col-md-4 mb-3">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="bi bi-list-ul me-2"></i>Template Categories</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="list-group list-group-flush">
+                            <button class="list-group-item list-group-item-action @(SelectedCategory == null ? "active" : "")" @onclick="() => SelectCategory(null)">
+                                All Templates (@Templates.Count)
+                            </button>
+                            @foreach (var category in Categories)
+                            {
+                                var count = Templates.Count(t => t.Category == category);
+                                <button class="list-group-item list-group-item-action @(SelectedCategory == category ? "active" : "")" @onclick="() => SelectCategory(category)">
+                                    @category (@count)
+                                </button>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-8 mb-3">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-light">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">@(SelectedCategory == null ? "All Templates" : SelectedCategory)</h5>
+                            <div>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" placeholder="Search templates..." @bind="SearchTerm" />
+                                    <button class="btn btn-outline-secondary" type="button">
+                                        <i class="bi bi-search"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Source Table</th>
+                                        <th>Target Table</th>
+                                        <th>Last Modified</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var template in FilteredTemplates)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <strong>@template.Name</strong>
+                                                @if (!string.IsNullOrEmpty(template.Description))
+                                                {
+                                                    <div class="small text-muted">@template.Description</div>
+                                                }
+                                            </td>
+                                            <td>@template.SourceTable</td>
+                                            <td>@template.TargetTable</td>
+                                            <td>@template.LastModified.ToString("g")</td>
+                                            <td>
+                                                <div class="btn-group">
+                                                    <button class="btn btn-sm btn-outline-primary" @onclick="() => UseTemplate(template)">
+                                                        <i class="bi bi-box-arrow-up-right me-1"></i>Use
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => EditTemplate(template)">
+                                                        <i class="bi bi-pencil me-1"></i>Edit
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteTemplate(template)">
+                                                        <i class="bi bi-trash me-1"></i>Delete
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (ShowDeleteConfirmation)
+    {
+        <div class="modal fade show" style="display: block; background-color: rgba(0,0,0,0.5);" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Delete Template</h5>
+                        <button type="button" class="btn-close" @onclick="CancelDelete"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Are you sure you want to delete the template <strong>"@TemplateToDelete?.Name"</strong>?</p>
+                        <p class="text-danger">This action cannot be undone.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CancelDelete">Cancel</button>
+                        <button type="button" class="btn btn-danger" @onclick="ConfirmDelete">Delete</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool IsLoading { get; set; } = true;
+    private List<MappingTemplate> Templates { get; set; } = new List<MappingTemplate>();
+    private string SearchTerm { get; set; } = "";
+    private string SelectedCategory { get; set; }
+    private bool ShowDeleteConfirmation { get; set; } = false;
+    private MappingTemplate TemplateToDelete { get; set; }
+
+    private IEnumerable<string> Categories => Templates
+        .Where(t => !string.IsNullOrEmpty(t.Category))
+        .Select(t => t.Category)
+        .Distinct()
+        .OrderBy(c => c);
+
+    private IEnumerable<MappingTemplate> FilteredTemplates => Templates
+        .Where(t => SelectedCategory == null || t.Category == SelectedCategory)
+        .Where(t => string.IsNullOrEmpty(SearchTerm) || 
+                   t.Name.Contains(SearchTerm, StringComparison.OrdinalIgnoreCase) ||
+                   t.Description.Contains(SearchTerm, StringComparison.OrdinalIgnoreCase) ||
+                   t.SourceTable.Contains(SearchTerm, StringComparison.OrdinalIgnoreCase) ||
+                   t.TargetTable.Contains(SearchTerm, StringComparison.OrdinalIgnoreCase))
+        .OrderByDescending(t => t.LastModified);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTemplates();
+    }
+
+    private async Task LoadTemplates()
+    {
+        IsLoading = true;
+        
+        try
+        {
+            Templates = await MappingService.GetMappingTemplatesAsync();
+        }
+        catch
+        {
+            // Handle error
+            Templates = new List<MappingTemplate>();
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private void SelectCategory(string category)
+    {
+        SelectedCategory = category;
+    }
+
+    private void CreateNewTemplate()
+    {
+        NavManager.NavigateTo("/mapping-creator?mode=template");
+    }
+
+    private void UseTemplate(MappingTemplate template)
+    {
+        NavManager.NavigateTo($"/mapping-creator?templateId={template.Id}");
+    }
+
+    private void EditTemplate(MappingTemplate template)
+    {
+        NavManager.NavigateTo($"/mapping-creator?templateId={template.Id}&edit=true");
+    }
+
+    private void DeleteTemplate(MappingTemplate template)
+    {
+        TemplateToDelete = template;
+        ShowDeleteConfirmation = true;
+    }
+
+    private void CancelDelete()
+    {
+        ShowDeleteConfirmation = false;
+        TemplateToDelete = null;
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (TemplateToDelete != null)
+        {
+            await MappingService.DeleteMappingTemplateAsync(TemplateToDelete.Id);
+            await LoadTemplates();
+        }
+        
+        ShowDeleteConfirmation = false;
+        TemplateToDelete = null;
+    }
+} 

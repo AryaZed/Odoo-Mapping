@@ -19,4 +19,19 @@ namespace OdooMapping.Application.Interfaces
         Task<bool> DeleteAsync(int id);
         Task<int> SaveChangesAsync();
     }
+
+    /// <summary>
+    /// Generic repository interface for data access with Guid IDs
+    /// </summary>
+    /// <typeparam name="T">Entity type</typeparam>
+    public interface IGuidRepository<T> where T : class
+    {
+        Task<T> GetByIdAsync(Guid id);
+        Task<IEnumerable<T>> GetAllAsync();
+        Task<IEnumerable<T>> FindAsync(Expression<Func<T, bool>> predicate);
+        Task<T> AddAsync(T entity);
+        Task<T> UpdateAsync(T entity);
+        Task<bool> DeleteAsync(Guid id);
+        Task<int> SaveChangesAsync();
+    }
 } 

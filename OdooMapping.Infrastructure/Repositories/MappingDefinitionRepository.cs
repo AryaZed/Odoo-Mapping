@@ -22,7 +22,7 @@ namespace OdooMapping.Infrastructure.Repositories
             _context = context;
         }
         
-        public async Task<MappingDefinition> GetByIdAsync(int id)
+        public async Task<MappingDefinition> GetByIdAsync(Guid id)
         {
             return await _context.MappingDefinitions.FindAsync(id);
         }
@@ -52,7 +52,7 @@ namespace OdooMapping.Infrastructure.Repositories
             return entity;
         }
         
-        public async Task<bool> DeleteAsync(int id)
+        public async Task<bool> DeleteAsync(Guid id)
         {
             var entity = await _context.MappingDefinitions.FindAsync(id);
             if (entity == null)
@@ -75,7 +75,7 @@ namespace OdooMapping.Infrastructure.Repositories
                 .ToListAsync();
         }
         
-        public async Task<MappingDefinition> GetMappingWithFieldsAsync(int id)
+        public async Task<MappingDefinition> GetMappingWithFieldsAsync(Guid id)
         {
             return await _context.MappingDefinitions
                 .Include(m => m.FieldMappings)

@@ -7,134 +7,176 @@
 @inject MappingService MappingService
 @inject NavigationManager NavManager
 
-<h1>Database Mapping Creator</h1>
+<div class="container-fluid">
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h3><i class="bi bi-database-fill-gear me-2"></i>Database Mapping Creator</h3>
+                <div>
+                    <button class="btn btn-primary" @onclick="SaveMapping" disabled="@(!CanSaveMapping)">
+                        <i class="bi bi-save me-1"></i> Save Mapping
+                    </button>
+                </div>
+            </div>
+            <hr />
+        </div>
+    </div>
 
-<div class="container">
     <div class="row mb-4">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5>Source SQL Server Database</h5>
+        <div class="col-md-6 mb-3">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-server me-2"></i>Source SQL Server Database</h5>
                 </div>
                 <div class="card-body">
                     <div class="form-group mb-3">
-                        <label>Connection String:</label>
-                        <input type="text" class="form-control" @bind="SqlServerConnectionString" placeholder="Server=localhost;Database=mydb;User Id=user;Password=pass;TrustServerCertificate=True;" />
-                        <button class="btn btn-sm btn-secondary mt-2" @onclick="TestSqlServerConnection">Test Connection</button>
+                        <label class="form-label">Connection String:</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" @bind="SqlServerConnectionString" placeholder="Server=localhost;Database=mydb;User Id=user;Password=pass;TrustServerCertificate=True;" />
+                            <button class="btn btn-outline-primary" @onclick="TestSqlServerConnection">
+                                <i class="bi bi-check-circle me-1"></i> Test
+                            </button>
+                        </div>
                         @if (SqlServerConnectionTested)
                         {
-                            <span class="@(SqlServerConnectionValid ? "text-success" : "text-danger") ms-2">
-                                @(SqlServerConnectionValid ? "Connection successful!" : "Connection failed!")
-                            </span>
+                            <div class="mt-2">
+                                <span class="@(SqlServerConnectionValid ? "text-success" : "text-danger")">
+                                    <i class="bi @(SqlServerConnectionValid ? "bi-check-circle-fill" : "bi-exclamation-circle-fill")"></i>
+                                    @(SqlServerConnectionValid ? "Connection successful!" : "Connection failed!")
+                                </span>
+                            </div>
                         }
                     </div>
 
                     @if (SqlServerConnectionValid)
                     {
-                        <div class="form-group mb-3">
-                            <label>Database:</label>
-                            <select class="form-control" @bind="SelectedSqlServerDatabase" @bind:after="LoadSqlServerTables">
-                                <option value="">-- Select Database --</option>
-                                @foreach (var db in SqlServerDatabases)
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label class="form-label">Database:</label>
+                                    <select class="form-select" @bind="SelectedSqlServerDatabase" @bind:after="LoadSqlServerTables">
+                                        <option value="">-- Select Database --</option>
+                                        @foreach (var db in SqlServerDatabases)
+                                        {
+                                            <option value="@db">@db</option>
+                                        }
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                @if (!string.IsNullOrEmpty(SelectedSqlServerDatabase))
                                 {
-                                    <option value="@db">@db</option>
+                                    <div class="form-group mb-3">
+                                        <label class="form-label">Table:</label>
+                                        <select class="form-select" @bind="SelectedSqlServerTable" @bind:after="LoadSqlServerColumns">
+                                            <option value="">-- Select Table --</option>
+                                            @foreach (var table in SqlServerTables)
+                                            {
+                                                <option value="@table">@table</option>
+                                            }
+                                        </select>
+                                    </div>
                                 }
-                            </select>
+                            </div>
                         </div>
 
-                        @if (!string.IsNullOrEmpty(SelectedSqlServerDatabase))
+                        @if (!string.IsNullOrEmpty(SelectedSqlServerTable))
                         {
-                            <div class="form-group mb-3">
-                                <label>Table:</label>
-                                <select class="form-control" @bind="SelectedSqlServerTable" @bind:after="LoadSqlServerColumns">
-                                    <option value="">-- Select Table --</option>
-                                    @foreach (var table in SqlServerTables)
+                            <div class="form-group">
+                                <label class="form-label d-flex justify-content-between align-items-center">
+                                    <span>Select Columns:</span>
+                                    <button class="btn btn-sm btn-outline-secondary" @onclick="SelectAllSqlServerColumns">Select All</button>
+                                </label>
+                                <div class="border rounded p-2" style="max-height: 300px; overflow-y: auto;">
+                                    @foreach (var column in SqlServerColumns)
                                     {
-                                        <option value="@table">@table</option>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" @onchange="e => ToggleSqlServerColumn(column, e.Value != null && (bool)e.Value)" />
+                                            <label class="form-check-label">@column</label>
+                                        </div>
                                     }
-                                </select>
-                            </div>
-
-                            @if (!string.IsNullOrEmpty(SelectedSqlServerTable))
-                            {
-                                <div class="form-group">
-                                    <label>Columns:</label>
-                                    <div style="max-height: 300px; overflow-y: auto;">
-                                        @foreach (var column in SqlServerColumns)
-                                        {
-                                            <div class="form-check">
-                                                <input class="form-check-input" type="checkbox" @onchange="e => ToggleSqlServerColumn(column, e.Value != null && (bool)e.Value)" />
-                                                <label class="form-check-label">@column</label>
-                                            </div>
-                                        }
-                                    </div>
                                 </div>
-                            }
+                            </div>
                         }
                     }
                 </div>
             </div>
         </div>
 
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5>Target Odoo PostgreSQL Database</h5>
+        <div class="col-md-6 mb-3">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="bi bi-database me-2"></i>Target Odoo PostgreSQL Database</h5>
                 </div>
                 <div class="card-body">
                     <div class="form-group mb-3">
-                        <label>Connection String:</label>
-                        <input type="text" class="form-control" @bind="PostgresConnectionString" placeholder="Host=localhost;Port=5432;Database=odoo;Username=odoo;Password=odoo;" />
-                        <button class="btn btn-sm btn-secondary mt-2" @onclick="TestPostgresConnection">Test Connection</button>
+                        <label class="form-label">Connection String:</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" @bind="PostgresConnectionString" placeholder="Host=localhost;Port=5432;Database=odoo;Username=odoo;Password=odoo;" />
+                            <button class="btn btn-outline-success" @onclick="TestPostgresConnection">
+                                <i class="bi bi-check-circle me-1"></i> Test
+                            </button>
+                        </div>
                         @if (PostgresConnectionTested)
                         {
-                            <span class="@(PostgresConnectionValid ? "text-success" : "text-danger") ms-2">
-                                @(PostgresConnectionValid ? "Connection successful!" : "Connection failed!")
-                            </span>
+                            <div class="mt-2">
+                                <span class="@(PostgresConnectionValid ? "text-success" : "text-danger")">
+                                    <i class="bi @(PostgresConnectionValid ? "bi-check-circle-fill" : "bi-exclamation-circle-fill")"></i>
+                                    @(PostgresConnectionValid ? "Connection successful!" : "Connection failed!")
+                                </span>
+                            </div>
                         }
                     </div>
 
                     @if (PostgresConnectionValid)
                     {
-                        <div class="form-group mb-3">
-                            <label>Database:</label>
-                            <select class="form-control" @bind="SelectedPostgresDatabase" @bind:after="LoadPostgresTables">
-                                <option value="">-- Select Database --</option>
-                                @foreach (var db in PostgresDatabases)
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label class="form-label">Database:</label>
+                                    <select class="form-select" @bind="SelectedPostgresDatabase" @bind:after="LoadPostgresTables">
+                                        <option value="">-- Select Database --</option>
+                                        @foreach (var db in PostgresDatabases)
+                                        {
+                                            <option value="@db">@db</option>
+                                        }
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                @if (!string.IsNullOrEmpty(SelectedPostgresDatabase))
                                 {
-                                    <option value="@db">@db</option>
+                                    <div class="form-group mb-3">
+                                        <label class="form-label">Table:</label>
+                                        <select class="form-select" @bind="SelectedPostgresTable" @bind:after="LoadPostgresColumns">
+                                            <option value="">-- Select Table --</option>
+                                            @foreach (var table in PostgresTables)
+                                            {
+                                                <option value="@table">@table</option>
+                                            }
+                                        </select>
+                                    </div>
                                 }
-                            </select>
+                            </div>
                         </div>
 
-                        @if (!string.IsNullOrEmpty(SelectedPostgresDatabase))
+                        @if (!string.IsNullOrEmpty(SelectedPostgresTable))
                         {
-                            <div class="form-group mb-3">
-                                <label>Table:</label>
-                                <select class="form-control" @bind="SelectedPostgresTable" @bind:after="LoadPostgresColumns">
-                                    <option value="">-- Select Table --</option>
-                                    @foreach (var table in PostgresTables)
+                            <div class="form-group">
+                                <label class="form-label d-flex justify-content-between align-items-center">
+                                    <span>Select Columns:</span>
+                                    <button class="btn btn-sm btn-outline-secondary" @onclick="SelectAllPostgresColumns">Select All</button>
+                                </label>
+                                <div class="border rounded p-2" style="max-height: 300px; overflow-y: auto;">
+                                    @foreach (var column in PostgresColumns)
                                     {
-                                        <option value="@table">@table</option>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" @onchange="e => TogglePostgresColumn(column, e.Value != null && (bool)e.Value)" />
+                                            <label class="form-check-label">@column</label>
+                                        </div>
                                     }
-                                </select>
-                            </div>
-
-                            @if (!string.IsNullOrEmpty(SelectedPostgresTable))
-                            {
-                                <div class="form-group">
-                                    <label>Columns:</label>
-                                    <div style="max-height: 300px; overflow-y: auto;">
-                                        @foreach (var column in PostgresColumns)
-                                        {
-                                            <div class="form-check">
-                                                <input class="form-check-input" type="checkbox" @onchange="e => TogglePostgresColumn(column, e.Value != null && (bool)e.Value)" />
-                                                <label class="form-check-label">@column</label>
-                                            </div>
-                                        }
-                                    </div>
                                 </div>
-                            }
+                            </div>
                         }
                     }
                 </div>
@@ -146,104 +188,155 @@
     {
         <div class="row mb-4">
             <div class="col-12">
-                <div class="card">
-                    <div class="card-header">
-                        <h5>Field Mappings</h5>
+                <div class="card shadow-sm">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0"><i class="bi bi-arrow-left-right me-2"></i>Field Mappings</h5>
                     </div>
                     <div class="card-body">
-                        <div class="form-group mb-3">
-                            <label>Mapping Name:</label>
-                            <input type="text" class="form-control" @bind="MappingName" placeholder="Enter a name for this mapping" />
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label class="form-label">Mapping Name:</label>
+                                    <input type="text" class="form-control" @bind="MappingName" placeholder="Enter a name for this mapping" />
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label class="form-label">Description:</label>
+                                    <textarea class="form-control" @bind="MappingDescription" placeholder="Enter a description" rows="1"></textarea>
+                                </div>
+                            </div>
                         </div>
 
-                        <div class="form-group mb-3">
-                            <label>Description:</label>
-                            <textarea class="form-control" @bind="MappingDescription" placeholder="Enter a description"></textarea>
-                        </div>
-
-                        <table class="table table-bordered">
-                            <thead>
-                                <tr>
-                                    <th>Source Field</th>
-                                    <th>Target Field</th>
-                                    <th>Transformation</th>
-                                    <th>Default Value</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var mapping in FieldMappings)
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                @if (IsOdooDatabase && OdooFields.Any())
                                 {
-                                    <tr>
-                                        <td>
-                                            <select class="form-control" @bind="mapping.SourceField">
-                                                <option value="">-- Select Source Field --</option>
-                                                @foreach (var field in SelectedSqlServerColumns)
-                                                {
-                                                    <option value="@field">@field</option>
-                                                }
-                                            </select>
-                                        </td>
-                                        <td>
-                                            <select class="form-control" @bind="mapping.TargetField">
-                                                <option value="">-- Select Target Field --</option>
-                                                @foreach (var field in SelectedPostgresColumns)
-                                                {
-                                                    <option value="@field">@field</option>
-                                                }
-                                            </select>
-                                        </td>
-                                        <td>
-                                            <select class="form-control" @bind="mapping.TransformationExpression">
-                                                <option value="">None</option>
-                                                <option value="uppercase">UPPERCASE</option>
-                                                <option value="lowercase">lowercase</option>
-                                            </select>
-                                        </td>
-                                        <td>
-                                            <input type="text" class="form-control" @bind="mapping.DefaultValue" placeholder="Default value" />
-                                        </td>
-                                        <td>
-                                            <button class="btn btn-sm btn-danger" @onclick="() => RemoveFieldMapping(mapping)">Remove</button>
-                                        </td>
-                                    </tr>
+                                    <div class="alert alert-info">
+                                        <div class="d-flex">
+                                            <i class="bi bi-info-circle-fill me-2 fs-5"></i>
+                                            <div>
+                                                <strong>Odoo Database Detected!</strong>
+                                                <p class="mb-0">We have detected that your target database is an Odoo database. The mapping tool has loaded information about Odoo field types and relations.</p>
+                                            </div>
+                                        </div>
+                                    </div>
                                 }
-                            </tbody>
-                        </table>
-
-                        <button class="btn btn-primary" @onclick="AddFieldMapping">Add Mapping</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header">
-                        <h5>Execution Settings</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="form-check mb-3">
-                            <input class="form-check-input" type="checkbox" @bind="TruncateTargetBeforeInsert" id="truncate-target" />
-                            <label class="form-check-label" for="truncate-target">
-                                Truncate target table before insert
-                            </label>
+                            </div>
                         </div>
 
-                        <div class="form-group mb-3">
-                            <label>Batch Size:</label>
-                            <input type="number" class="form-control" @bind="BatchSize" min="1" max="10000" />
+                        <div class="d-flex justify-content-between mb-3">
+                            <div>
+                                @if (MappingValidationErrors.Any())
+                                {
+                                    <div class="alert alert-warning py-2 px-3 mb-0">
+                                        <i class="bi bi-exclamation-triangle me-2"></i>
+                                        <strong>Validation Issues:</strong> @MappingValidationErrors.Count issue(s) found
+                                        <button class="btn btn-sm btn-link" type="button" data-bs-toggle="collapse" data-bs-target="#validationErrors">
+                                            Show Details
+                                        </button>
+                                    </div>
+                                }
+                            </div>
+                            <button class="btn btn-outline-info" @onclick="AddFieldMapping">
+                                <i class="bi bi-plus-circle me-1"></i> Add Field Mapping
+                            </button>
                         </div>
 
-                        <div class="form-check mb-3">
-                            <input class="form-check-input" type="checkbox" @bind="IsActive" id="is-active" />
-                            <label class="form-check-label" for="is-active">
-                                Activate this mapping
-                            </label>
+                        @if (MappingValidationErrors.Any())
+                        {
+                            <div class="collapse mb-3" id="validationErrors">
+                                <div class="card card-body bg-light">
+                                    <ul class="mb-0">
+                                        @foreach (var error in MappingValidationErrors)
+                                        {
+                                            <li>@error</li>
+                                        }
+                                    </ul>
+                                </div>
+                            </div>
+                        }
+
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 25%">Source Field</th>
+                                        <th style="width: 25%">Target Field</th>
+                                        <th style="width: 20%">Transformation</th>
+                                        <th style="width: 15%">Default Value</th>
+                                        <th style="width: 10%">Field Type</th>
+                                        <th style="width: 5%"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var mapping in FieldMappings)
+                                    {
+                                        <tr class="@(HasFieldMappingWarning(mapping) ? "table-warning" : "")">
+                                            <td>
+                                                <select class="form-select" @bind="mapping.SourceField">
+                                                    <option value="">-- Select Source Field --</option>
+                                                    @foreach (var field in SelectedSqlServerColumns)
+                                                    {
+                                                        <option value="@field">@field</option>
+                                                    }
+                                                </select>
+                                            </td>
+                                            <td>
+                                                <select class="form-select" @bind="mapping.TargetField" @bind:after="() => UpdateFieldMappingMetadata(mapping)">
+                                                    <option value="">-- Select Target Field --</option>
+                                                    @foreach (var field in SelectedPostgresColumns)
+                                                    {
+                                                        <option value="@field">@field</option>
+                                                    }
+                                                </select>
+                                            </td>
+                                            <td>
+                                                <select class="form-select" @bind="mapping.TransformationExpression">
+                                                    <option value="">None</option>
+                                                    <option value="uppercase">UPPERCASE</option>
+                                                    <option value="lowercase">lowercase</option>
+                                                    @if (IsOdooDatabase && GetOdooFieldType(mapping.TargetField) == "many2one")
+                                                    {
+                                                        <option value="lookup_id">Lookup ID by Name</option>
+                                                    }
+                                                </select>
+                                            </td>
+                                            <td>
+                                                <input type="text" class="form-control" @bind="mapping.DefaultValue" placeholder="Default" />
+                                            </td>
+                                            <td>
+                                                @if (IsOdooDatabase)
+                                                {
+                                                    var fieldType = GetOdooFieldType(mapping.TargetField);
+                                                    <span class="@GetFieldTypeBadgeClass(fieldType)">
+                                                        @GetFieldTypeDisplayName(fieldType)
+                                                    </span>
+                                                }
+                                            </td>
+                                            <td class="text-center">
+                                                <button class="btn btn-sm btn-outline-danger" @onclick="() => RemoveFieldMapping(mapping)">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
                         </div>
 
-                        <button class="btn btn-success" @onclick="SaveMapping">Save Mapping</button>
+                        @if (IsOdooDatabase)
+                        {
+                            <div class="mt-3">
+                                <h6>Odoo Relational Field Mapping Tips:</h6>
+                                <ul class="small">
+                                    <li><strong>Many2one fields</strong> (e.g., <code>partner_id</code>) require an ID value or a name lookup transformation.</li>
+                                    <li><strong>One2many fields</strong> are typically not directly mapped; instead, map to the related model.</li>
+                                    <li><strong>Many2many fields</strong> require special handling - typically a comma-separated list of IDs.</li>
+                                    <li>Use the <a href="/odoo-model-browser" target="_blank">Odoo Model Browser</a> to explore relationships between tables.</li>
+                                </ul>
+                            </div>
+                        }
                     </div>
                 </div>
             </div>
@@ -281,6 +374,11 @@
     private int BatchSize { get; set; } = 100;
     private bool IsActive { get; set; } = true;
     private List<FieldMapping> FieldMappings { get; set; } = new List<FieldMapping>();
+
+    // Odoo-specific properties
+    private bool IsOdooDatabase { get; set; }
+    private List<OdooField> OdooFields { get; set; } = new List<OdooField>();
+    private List<string> MappingValidationErrors { get; set; } = new List<string>();
 
     private async Task TestSqlServerConnection()
     {
@@ -366,9 +464,29 @@
         {
             var builder = new NpgsqlConnectionStringBuilder(PostgresConnectionString);
             builder.Database = SelectedPostgresDatabase;
+            var connectionString = builder.ConnectionString;
 
-            PostgresColumns = await DatabaseService.GetPostgresColumnsAsync(builder.ConnectionString, SelectedPostgresTable);
+            PostgresColumns = await DatabaseService.GetPostgresColumnsAsync(connectionString, SelectedPostgresTable);
             SelectedPostgresColumns.Clear();
+            FieldMappings.Clear();
+            OdooFields.Clear();
+            
+            // Check if this is an Odoo database by attempting to get model information
+            try
+            {
+                // Convert table name to potential Odoo model name (res_partner -> res.partner)
+                string potentialModelName = SelectedPostgresTable.Replace("_", ".");
+                
+                // Try to get fields for this model
+                OdooFields = await DatabaseService.GetOdooFieldsAsync(connectionString, potentialModelName);
+                
+                // If we get fields back, this is an Odoo database
+                IsOdooDatabase = OdooFields.Any();
+            }
+            catch
+            {
+                IsOdooDatabase = false;
+            }
         }
     }
 
@@ -396,18 +514,34 @@
         }
     }
 
+    private void SelectAllSqlServerColumns()
+    {
+        SelectedSqlServerColumns = new List<string>(SqlServerColumns);
+        StateHasChanged();
+    }
+
+    private void SelectAllPostgresColumns()
+    {
+        SelectedPostgresColumns = new List<string>(PostgresColumns);
+        StateHasChanged();
+    }
+
     private void AddFieldMapping()
     {
-        FieldMappings.Add(new FieldMapping
-        {
-            RequiresTransformation = false
-        });
+        FieldMappings.Add(new FieldMapping());
+        StateHasChanged();
     }
 
     private void RemoveFieldMapping(FieldMapping mapping)
     {
         FieldMappings.Remove(mapping);
+        StateHasChanged();
     }
+
+    private bool CanSaveMapping => 
+        !string.IsNullOrWhiteSpace(MappingName) && 
+        FieldMappings.Any() && 
+        FieldMappings.All(m => !string.IsNullOrWhiteSpace(m.SourceField) && !string.IsNullOrWhiteSpace(m.TargetField));
 
     private async Task SaveMapping()
     {
@@ -457,6 +591,142 @@
         {
             // Handle error - in real app, show error to user
             Console.WriteLine(ex.Message);
+        }
+    }
+
+    private void UpdateFieldMappingMetadata(FieldMapping mapping)
+    {
+        if (IsOdooDatabase && !string.IsNullOrEmpty(mapping.TargetField))
+        {
+            var odooField = OdooFields.FirstOrDefault(f => f.Name == mapping.TargetField || f.GetColumnName() == mapping.TargetField);
+            
+            if (odooField != null)
+            {
+                // Update field type in mapping
+                mapping.TargetFieldType = odooField.FieldType;
+                
+                // For many2one fields, suggest appropriate transformation
+                if (odooField.FieldType == "many2one" && string.IsNullOrEmpty(mapping.TransformationExpression))
+                {
+                    mapping.TransformationExpression = "lookup_id";
+                }
+                
+                // For required fields, add validation
+                if (odooField.Required && string.IsNullOrEmpty(mapping.DefaultValue))
+                {
+                    mapping.RequiresDefaultValue = true;
+                }
+            }
+            
+            ValidateMappings();
+        }
+    }
+
+    private void ValidateMappings()
+    {
+        MappingValidationErrors.Clear();
+        
+        if (!IsOdooDatabase)
+            return;
+            
+        foreach (var mapping in FieldMappings.Where(m => !string.IsNullOrEmpty(m.TargetField)))
+        {
+            var odooField = OdooFields.FirstOrDefault(f => f.Name == mapping.TargetField || f.GetColumnName() == mapping.TargetField);
+            
+            if (odooField == null)
+                continue;
+                
+            // Required field validation
+            if (odooField.Required && string.IsNullOrEmpty(mapping.SourceField) && string.IsNullOrEmpty(mapping.DefaultValue))
+            {
+                MappingValidationErrors.Add($"Field '{odooField.Name}' is required but has no source field or default value");
+            }
+            
+            // Relational field validation
+            if (odooField.FieldType == "many2one" && !string.IsNullOrEmpty(mapping.SourceField) && mapping.TransformationExpression != "lookup_id")
+            {
+                MappingValidationErrors.Add($"Field '{odooField.Name}' is a many2one relation. Consider using the 'Lookup ID by Name' transformation");
+            }
+            
+            if ((odooField.FieldType == "one2many" || odooField.FieldType == "many2many") && !string.IsNullOrEmpty(mapping.SourceField))
+            {
+                MappingValidationErrors.Add($"Field '{odooField.Name}' is a {odooField.FieldType} relation and may require special handling");
+            }
+        }
+    }
+
+    private bool HasFieldMappingWarning(FieldMapping mapping)
+    {
+        if (!IsOdooDatabase || string.IsNullOrEmpty(mapping.TargetField))
+            return false;
+            
+        var odooField = OdooFields.FirstOrDefault(f => f.Name == mapping.TargetField || f.GetColumnName() == mapping.TargetField);
+        
+        if (odooField == null)
+            return false;
+            
+        // Warning for required fields
+        if (odooField.Required && string.IsNullOrEmpty(mapping.SourceField) && string.IsNullOrEmpty(mapping.DefaultValue))
+            return true;
+            
+        // Warning for relational fields without transformation
+        if (odooField.FieldType == "many2one" && !string.IsNullOrEmpty(mapping.SourceField) && mapping.TransformationExpression != "lookup_id")
+            return true;
+            
+        if ((odooField.FieldType == "one2many" || odooField.FieldType == "many2many") && !string.IsNullOrEmpty(mapping.SourceField))
+            return true;
+            
+        return false;
+    }
+
+    private string GetOdooFieldType(string fieldName)
+    {
+        if (!IsOdooDatabase || string.IsNullOrEmpty(fieldName))
+            return "";
+            
+        var odooField = OdooFields.FirstOrDefault(f => f.Name == fieldName || f.GetColumnName() == fieldName);
+        return odooField?.FieldType ?? "";
+    }
+
+    private string GetFieldTypeDisplayName(string fieldType)
+    {
+        switch (fieldType)
+        {
+            case "char":
+            case "text":
+                return "Text";
+            case "integer":
+                return "Integer";
+            case "float":
+                return "Float";
+            case "boolean":
+                return "Boolean";
+            case "date":
+                return "Date";
+            case "datetime":
+                return "Date & Time";
+            case "many2one":
+                return "Many→One";
+            case "one2many":
+                return "One→Many";
+            case "many2many":
+                return "Many↔Many";
+            default:
+                return fieldType;
+        }
+    }
+
+    private string GetFieldTypeBadgeClass(string fieldType)
+    {
+        switch (fieldType)
+        {
+            case "many2one":
+                return "badge bg-primary";
+            case "one2many":
+            case "many2many":
+                return "badge bg-warning text-dark";
+            default:
+                return "badge bg-secondary";
         }
     }
 } 

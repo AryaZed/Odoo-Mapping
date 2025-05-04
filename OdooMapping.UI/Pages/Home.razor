@@ -1,7 +1,112 @@
 ﻿@page "/"
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Odoo Mapping Tool - Home</PageTitle>
 
-<h1>Hello, world!</h1>
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12 text-center mb-5">
+            <h1 class="display-4 fw-bold">Welcome to Odoo Mapping Tool</h1>
+            <p class="lead">Create and manage data mappings between SQL Server and Odoo PostgreSQL databases</p>
+            <hr class="my-4" />
+        </div>
+    </div>
 
-Welcome to your new app.
+    <div class="row">
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 shadow-sm hover-card">
+                <div class="card-body text-center">
+                    <i class="bi bi-database-fill-gear text-primary" style="font-size: 3rem;"></i>
+                    <h3 class="mt-3">Database Mapping</h3>
+                    <p class="card-text">Create mappings between your SQL Server and Odoo PostgreSQL tables.</p>
+                    <a href="mapping-creator" class="btn btn-primary mt-3">Get Started</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 shadow-sm hover-card">
+                <div class="card-body text-center">
+                    <i class="bi bi-diagram-3 text-info" style="font-size: 3rem;"></i>
+                    <h3 class="mt-3">Odoo Model Browser</h3>
+                    <p class="card-text">Explore Odoo modules, models, fields, and relationships to create accurate mappings.</p>
+                    <a href="odoo-model-browser" class="btn btn-info mt-3">Browse Models</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 shadow-sm hover-card">
+                <div class="card-body text-center">
+                    <i class="bi bi-play-fill text-success" style="font-size: 3rem;"></i>
+                    <h3 class="mt-3">Execute Mappings</h3>
+                    <p class="card-text">Run your defined mappings to transfer data between systems.</p>
+                    <a href="#" class="btn btn-success mt-3">Execute Mappings</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-3">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h4 class="mb-3">Understanding Odoo Relationships</h4>
+                    <p>
+                        Odoo uses several types of relationship fields to connect records across different tables. 
+                        Understanding these relationships is critical for creating accurate mappings:
+                    </p>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="card mb-3">
+                                <div class="card-header bg-primary text-white">
+                                    <strong>Many2one (Many → One)</strong>
+                                </div>
+                                <div class="card-body">
+                                    <p class="small">
+                                        A reference to a single record in another model. In the database, stored as a foreign key ID. 
+                                        Example: <code>partner_id</code> in a sales order references a single customer.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card mb-3">
+                                <div class="card-header bg-warning text-dark">
+                                    <strong>One2many (One → Many)</strong>
+                                </div>
+                                <div class="card-body">
+                                    <p class="small">
+                                        The inverse of many2one, representing related records. Not stored in the database directly.
+                                        Example: <code>order_ids</code> in a customer record shows all related orders.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card mb-3">
+                                <div class="card-header bg-info text-white">
+                                    <strong>Many2many (Many ↔ Many)</strong>
+                                </div>
+                                <div class="card-body">
+                                    <p class="small">
+                                        Many records related to many other records. Stored in a separate relation table.
+                                        Example: <code>category_ids</code> relates products to multiple categories.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .hover-card {
+        transition: transform 0.3s ease;
+    }
+    .hover-card:hover {
+        transform: translateY(-5px);
+    }
+</style>

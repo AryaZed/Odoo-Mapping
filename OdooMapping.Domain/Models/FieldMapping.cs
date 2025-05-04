@@ -22,6 +22,7 @@ namespace OdooMapping.Domain.Models
         public bool RequiresTransformation { get; set; }
         public string TransformationExpression { get; set; }
         public string DefaultValue { get; set; }
+        public bool RequiresDefaultValue { get; set; }
         
         // Navigation property
         public MappingDefinition MappingDefinition { get; set; }

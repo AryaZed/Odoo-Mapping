@@ -30,7 +30,7 @@ namespace OdooMapping.Application.Services
         /// <summary>
         /// Executes a mapping operation by ID
         /// </summary>
-        public async Task<MappingResult> ExecuteMappingAsync(int mappingId)
+        public async Task<MappingResult> ExecuteMappingAsync(Guid mappingId)
         {
             var mapping = await _mappingRepository.GetMappingWithFieldsAsync(mappingId);
             if (mapping == null)
@@ -86,7 +86,7 @@ namespace OdooMapping.Application.Services
                 stopwatch.Stop();
                 
                 // Update mapping with execution details
-                mapping.LastExecuted = DateTime.Now;
+                mapping.LastExecutedAt = DateTime.Now;
                 mapping.LastRecordCount = recordsProcessed;
                 mapping.LastExecutionSuccessful = true;
                 mapping.LastExecutionLog = $"Successfully processed {recordsProcessed} records in {stopwatch.Elapsed.TotalSeconds:F2} seconds.";
@@ -106,7 +106,7 @@ namespace OdooMapping.Application.Services
                 stopwatch.Stop();
                 
                 // Update mapping with failure details
-                mapping.LastExecuted = DateTime.Now;
+                mapping.LastExecutedAt = DateTime.Now;
                 mapping.LastExecutionSuccessful = false;
                 mapping.LastExecutionLog = $"Error: {ex.Message}";
                 
@@ -125,7 +125,7 @@ namespace OdooMapping.Application.Services
         /// <summary>
         /// Validates a mapping definition by ID
         /// </summary>
-        public async Task<ValidationResult> ValidateMappingAsync(int mappingId)
+        public async Task<ValidationResult> ValidateMappingAsync(Guid mappingId)
         {
             var mapping = await _mappingRepository.GetMappingWithFieldsAsync(mappingId);
             if (mapping == null)

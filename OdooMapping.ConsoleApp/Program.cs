@@ -36,7 +36,7 @@ namespace OdooMapping.ConsoleApp
                 var serviceProvider = services.BuildServiceProvider();
                 
                 // Run the mapping operation
-                if (args.Length > 0 && int.TryParse(args[0], out int mappingId))
+                if (args.Length > 0 && Guid.TryParse(args[0], out Guid mappingId))
                 {
                     await RunMapping(serviceProvider, mappingId);
                 }
@@ -73,7 +73,7 @@ namespace OdooMapping.ConsoleApp
                 new PostgreSqlDataService());
         }
         
-        private static async Task RunMapping(ServiceProvider serviceProvider, int mappingId)
+        private static async Task RunMapping(ServiceProvider serviceProvider, Guid mappingId)
         {
             var mappingService = serviceProvider.GetRequiredService<IMappingService>();
             
@@ -99,7 +99,7 @@ namespace OdooMapping.ConsoleApp
         private static void ShowUsage()
         {
             Console.WriteLine("Usage: OdooMapping.ConsoleApp <mapping-id>");
-            Console.WriteLine("\nExample: OdooMapping.ConsoleApp 1");
+            Console.WriteLine("\nExample: OdooMapping.ConsoleApp 00000000-0000-0000-0000-000000000000");
         }
     }
 }

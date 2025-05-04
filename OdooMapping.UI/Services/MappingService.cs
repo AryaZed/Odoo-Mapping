@@ -29,7 +29,7 @@ namespace OdooMapping.UI.Services
             return await response.Content.ReadFromJsonAsync<List<MappingDefinition>>(_jsonOptions);
         }
 
-        public async Task<MappingDefinition> GetMappingAsync(int id)
+        public async Task<MappingDefinition> GetMappingAsync(Guid id)
         {
             var response = await ApiClient.GetAsync($"api/mappings/{id}");
             response.EnsureSuccessStatusCode();
@@ -45,19 +45,24 @@ namespace OdooMapping.UI.Services
             return await response.Content.ReadFromJsonAsync<MappingDefinition>(_jsonOptions);
         }
 
-        public async Task UpdateMappingAsync(int id, MappingDefinition mapping)
+        public async Task UpdateMappingAsync(Guid id, MappingDefinition mapping)
         {
             var response = await ApiClient.PutAsJsonAsync($"api/mappings/{id}", mapping);
             response.EnsureSuccessStatusCode();
         }
 
-        public async Task DeleteMappingAsync(int id)
+        public async Task UpdateMappingAsync(MappingDefinition mapping)
+        {
+            await UpdateMappingAsync(mapping.Id, mapping);
+        }
+
+        public async Task DeleteMappingAsync(Guid id)
         {
             var response = await ApiClient.DeleteAsync($"api/mappings/{id}");
             response.EnsureSuccessStatusCode();
         }
 
-        public async Task<ValidationResult> ValidateMappingAsync(int id)
+        public async Task<ValidationResult> ValidateMappingAsync(Guid id)
         {
             var response = await ApiClient.PostAsync($"api/mappings/{id}/validate", null);
             
@@ -72,7 +77,7 @@ namespace OdooMapping.UI.Services
             }
         }
 
-        public async Task<MappingResult> ExecuteMappingAsync(int id)
+        public async Task<MappingResult> ExecuteMappingAsync(Guid id)
         {
             var response = await ApiClient.PostAsync($"api/mappings/{id}/execute", null);
             
@@ -85,6 +90,63 @@ namespace OdooMapping.UI.Services
                 var errorResponse = await response.Content.ReadFromJsonAsync<MappingResult>(_jsonOptions);
                 return errorResponse;
             }
+        }
+
+        public async Task<List<MappingTemplate>> GetMappingTemplatesAsync()
+        {
+            var response = await ApiClient.GetAsync("api/templates");
+            response.EnsureSuccessStatusCode();
+
+            return await response.Content.ReadFromJsonAsync<List<MappingTemplate>>(_jsonOptions);
+        }
+
+        public async Task<MappingTemplate> GetMappingTemplateAsync(Guid id)
+        {
+            var response = await ApiClient.GetAsync($"api/templates/{id}");
+            response.EnsureSuccessStatusCode();
+
+            return await response.Content.ReadFromJsonAsync<MappingTemplate>(_jsonOptions);
+        }
+
+        public async Task<MappingTemplate> CreateMappingTemplateAsync(MappingTemplate template)
+        {
+            var response = await ApiClient.PostAsJsonAsync("api/templates", template);
+            response.EnsureSuccessStatusCode();
+
+            return await response.Content.ReadFromJsonAsync<MappingTemplate>(_jsonOptions);
+        }
+
+        public async Task UpdateMappingTemplateAsync(Guid id, MappingTemplate template)
+        {
+            var response = await ApiClient.PutAsJsonAsync($"api/templates/{id}", template);
+            response.EnsureSuccessStatusCode();
+        }
+
+        public async Task DeleteMappingTemplateAsync(Guid id)
+        {
+            var response = await ApiClient.DeleteAsync($"api/templates/{id}");
+            response.EnsureSuccessStatusCode();
+        }
+
+        public async Task<List<MappingExecution>> GetMappingExecutionsAsync(Guid mappingId)
+        {
+            var response = await ApiClient.GetAsync($"api/mappings/{mappingId}/executions");
+            response.EnsureSuccessStatusCode();
+
+            return await response.Content.ReadFromJsonAsync<List<MappingExecution>>(_jsonOptions);
+        }
+        
+        public async Task<List<MappingExecution>> GetMappingExecutionsAsync()
+        {
+            var response = await ApiClient.GetAsync("api/executions");
+            response.EnsureSuccessStatusCode();
+
+            return await response.Content.ReadFromJsonAsync<List<MappingExecution>>(_jsonOptions);
+        }
+
+        public async Task<List<MappingDefinition>> GetMappingsAsync()
+        {
+            return await GetAllMappingsAsync();
         }
     }
 
@@ -104,7 +166,7 @@ namespace OdooMapping.UI.Services
         public DateTime StartTime { get; set; }
         public DateTime EndTime { get; set; }
         public TimeSpan Duration => EndTime - StartTime;
-        public string ErrorMessage { get; set; }
+        public string ErrorMessage { get; set; } = string.Empty;
         public List<string> Logs { get; set; } = new List<string>();
     }
 } 

@@ -20,4 +20,7 @@ builder.Services.AddHttpClient("OdooMappingApi", client =>
 builder.Services.AddScoped<DatabaseService>();
 builder.Services.AddScoped<MappingService>();
 
+// Add CSS reference for Bootstrap Icons
+builder.Services.AddScoped<HeadOutlet>();
+
 await builder.Build().RunAsync();

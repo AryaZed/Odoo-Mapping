@@ -1,0 +1,576 @@
+@page "/data-validation/{MappingId:guid}"
+@using OdooMapping.Domain.Models
+@using OdooMapping.UI.Services
+@inject MappingService MappingService
+@inject NavigationManager NavManager
+
+<div class="container-fluid">
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h3><i class="bi bi-shield-check me-2"></i>Data Validation Rules</h3>
+                <div>
+                    <button class="btn btn-secondary me-2" @onclick="GoBack">
+                        <i class="bi bi-arrow-left me-1"></i> Back
+                    </button>
+                    <button class="btn btn-primary" @onclick="AddRule">
+                        <i class="bi bi-plus-lg me-1"></i> Add Rule
+                    </button>
+                </div>
+            </div>
+            <hr />
+        </div>
+    </div>
+
+    @if (IsLoading)
+    {
+        <div class="row">
+            <div class="col-12 text-center p-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-3">Loading validation rules...</p>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Mapping: @Mapping?.Name</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>@Mapping?.Description</p>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="fw-bold">Source:</label>
+                                    <p class="mb-0">@(Mapping?.SourceQuery?.Split("FROM")?.FirstOrDefault()?.Replace("SELECT", "").Trim())</p>
+                                    <p class="mb-0 text-muted">FROM @(Mapping?.SourceQuery?.Split("FROM")?.LastOrDefault()?.Trim())</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="fw-bold">Target:</label>
+                                    <p class="mb-0">@Mapping?.TargetTable</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0"><i class="bi bi-list-check me-2"></i>Validation Rules</h5>
+                    </div>
+                    <div class="card-body">
+                        @if (!ValidationRules.Any())
+                        {
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle me-2"></i>
+                                No validation rules have been defined for this mapping. Add rules to ensure data quality.
+                            </div>
+                            <div class="text-center">
+                                <button class="btn btn-primary" @onclick="AddRule">
+                                    <i class="bi bi-plus-lg me-1"></i> Add Your First Rule
+                                </button>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th style="width: 20%">Name</th>
+                                            <th style="width: 15%">Field</th>
+                                            <th style="width: 15%">Rule Type</th>
+                                            <th style="width: 20%">Expression</th>
+                                            <th style="width: 15%">Severity</th>
+                                            <th style="width: 15%">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var rule in ValidationRules)
+                                        {
+                                            <tr>
+                                                <td>@rule.Name</td>
+                                                <td>@rule.Field</td>
+                                                <td>@GetRuleTypeDisplayName(rule.RuleType)</td>
+                                                <td>
+                                                    <code>@rule.Expression</code>
+                                                </td>
+                                                <td>
+                                                    <span class="@GetSeverityBadgeClass(rule.Severity)">
+                                                        @rule.Severity
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <div class="btn-group">
+                                                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => EditRule(rule)">
+                                                            <i class="bi bi-pencil me-1"></i>Edit
+                                                        </button>
+                                                        <button class="btn btn-sm @(rule.IsEnabled ? "btn-outline-warning" : "btn-outline-success")" @onclick="() => ToggleRuleEnabled(rule)">
+                                                            @if (rule.IsEnabled)
+                                                            {
+                                                                <i class="bi bi-pause-fill me-1"></i><span>Disable</span>
+                                                            }
+                                                            else
+                                                            {
+                                                                <i class="bi bi-play-fill me-1"></i><span>Enable</span>
+                                                            }
+                                                        </button>
+                                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteRule(rule)">
+                                                            <i class="bi bi-trash me-1"></i>Delete
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (ShowRuleEditor)
+    {
+        <div class="modal fade show" style="display: block; background-color: rgba(0,0,0,0.5);" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">@(EditingRule == null ? "Add Validation Rule" : "Edit Validation Rule")</h5>
+                        <button type="button" class="btn-close" @onclick="CloseRuleEditor"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Rule Name:</label>
+                            <input type="text" class="form-control" @bind="RuleName" placeholder="Enter a descriptive name" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Target Field:</label>
+                            <select class="form-select" @bind="RuleField">
+                                <option value="">-- Select Field --</option>
+                                @foreach (var field in AvailableFields)
+                                {
+                                    <option value="@field">@field</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Rule Type:</label>
+                            <select class="form-select" @bind="RuleType">
+                                <option value="required">Required (Not Null/Empty)</option>
+                                <option value="regex">Regular Expression</option>
+                                <option value="range">Numeric Range</option>
+                                <option value="length">Text Length</option>
+                                <option value="email">Email Format</option>
+                                <option value="date">Date Format/Range</option>
+                                <option value="enum">Enumeration (Value List)</option>
+                                <option value="custom">Custom Expression</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Expression:</label>
+                            @if (RuleType == "required")
+                            {
+                                <input type="text" class="form-control" value="required" disabled />
+                                <div class="form-text">Validates that the field is not null or empty.</div>
+                            }
+                            else if (RuleType == "regex")
+                            {
+                                <input type="text" class="form-control" @bind="RuleExpression" placeholder="^[A-Za-z0-9]+$" />
+                                <div class="form-text">Regular expression pattern that the field value must match.</div>
+                            }
+                            else if (RuleType == "range")
+                            {
+                                <div class="row">
+                                    <div class="col-6">
+                                        <input type="number" class="form-control" @bind="RangeMin" placeholder="Minimum" />
+                                    </div>
+                                    <div class="col-6">
+                                        <input type="number" class="form-control" @bind="RangeMax" placeholder="Maximum" />
+                                    </div>
+                                </div>
+                                <div class="form-text">Numeric value must be within this range (inclusive).</div>
+                            }
+                            else if (RuleType == "length")
+                            {
+                                <div class="row">
+                                    <div class="col-6">
+                                        <input type="number" class="form-control" @bind="LengthMin" placeholder="Minimum Length" min="0" />
+                                    </div>
+                                    <div class="col-6">
+                                        <input type="number" class="form-control" @bind="LengthMax" placeholder="Maximum Length" min="0" />
+                                    </div>
+                                </div>
+                                <div class="form-text">Text length must be within this range (characters).</div>
+                            }
+                            else if (RuleType == "email")
+                            {
+                                <input type="text" class="form-control" value="email" disabled />
+                                <div class="form-text">Validates that the field contains a valid email address.</div>
+                            }
+                            else if (RuleType == "date")
+                            {
+                                <div class="row">
+                                    <div class="col-6">
+                                        <input type="date" class="form-control" @bind="DateMin" />
+                                    </div>
+                                    <div class="col-6">
+                                        <input type="date" class="form-control" @bind="DateMax" />
+                                    </div>
+                                </div>
+                                <div class="form-text">Date must be within this range (leave blank for no min/max).</div>
+                            }
+                            else if (RuleType == "enum")
+                            {
+                                <textarea class="form-control" @bind="EnumValues" rows="3" placeholder="value1,value2,value3"></textarea>
+                                <div class="form-text">Comma-separated list of allowed values.</div>
+                            }
+                            else if (RuleType == "custom")
+                            {
+                                <textarea class="form-control" @bind="RuleExpression" rows="3" placeholder="value != null && value.ToString().StartsWith('ABC')"></textarea>
+                                <div class="form-text">Custom C# expression. Use 'value' to reference the field value.</div>
+                            }
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Error Message:</label>
+                            <input type="text" class="form-control" @bind="ErrorMessage" placeholder="Message to display when validation fails" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Severity:</label>
+                            <select class="form-select" @bind="Severity">
+                                <option value="Error">Error (Prevents Import)</option>
+                                <option value="Warning">Warning (Allows Import with Warning)</option>
+                                <option value="Info">Info (Informational Only)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="enabled-switch" @bind="IsEnabled">
+                            <label class="form-check-label" for="enabled-switch">Rule Enabled</label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CloseRuleEditor">Cancel</button>
+                        <button type="button" class="btn btn-primary" @onclick="SaveRule">Save Rule</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (ShowDeleteConfirmation)
+    {
+        <div class="modal fade show" style="display: block; background-color: rgba(0,0,0,0.5);" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Delete Rule</h5>
+                        <button type="button" class="btn-close" @onclick="CancelDelete"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Are you sure you want to delete the validation rule <strong>"@RuleToDelete?.Name"</strong>?</p>
+                        <p class="text-danger">This action cannot be undone.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CancelDelete">Cancel</button>
+                        <button type="button" class="btn btn-danger" @onclick="ConfirmDelete">Delete</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public Guid MappingId { get; set; }
+
+    private bool IsLoading { get; set; } = true;
+    private MappingDefinition Mapping { get; set; }
+    private List<ValidationRule> ValidationRules { get; set; } = new List<ValidationRule>();
+    private List<string> AvailableFields { get; set; } = new List<string>();
+
+    // Rule editor
+    private bool ShowRuleEditor { get; set; }
+    private ValidationRule EditingRule { get; set; }
+    private string RuleName { get; set; }
+    private string RuleField { get; set; }
+    private string RuleType { get; set; } = "required";
+    private string RuleExpression { get; set; }
+    private string ErrorMessage { get; set; }
+    private ValidationSeverity Severity { get; set; } = ValidationSeverity.Error;
+    private bool IsEnabled { get; set; } = true;
+
+    // For specific rule types
+    private int? RangeMin { get; set; }
+    private int? RangeMax { get; set; }
+    private int? LengthMin { get; set; }
+    private int? LengthMax { get; set; }
+    private DateTime? DateMin { get; set; }
+    private DateTime? DateMax { get; set; }
+    private string EnumValues { get; set; }
+
+    // Delete confirmation
+    private bool ShowDeleteConfirmation { get; set; }
+    private ValidationRule RuleToDelete { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        IsLoading = true;
+        
+        try
+        {
+            Mapping = await MappingService.GetMappingAsync(MappingId);
+            
+            if (Mapping != null)
+            {
+                ValidationRules = Mapping.ValidationRules ?? new List<ValidationRule>();
+                
+                // Extract fields from mappings
+                AvailableFields = Mapping.FieldMappings
+                    .Select(m => m.TargetField)
+                    .Where(f => !string.IsNullOrEmpty(f))
+                    .OrderBy(f => f)
+                    .ToList();
+            }
+        }
+        catch
+        {
+            // Handle error
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private void GoBack()
+    {
+        NavManager.NavigateTo($"/mapping-creator?mappingId={MappingId}&edit=true");
+    }
+
+    private void AddRule()
+    {
+        EditingRule = null;
+        RuleName = "";
+        RuleField = "";
+        RuleType = "required";
+        RuleExpression = "";
+        ErrorMessage = "";
+        Severity = ValidationSeverity.Error;
+        IsEnabled = true;
+        RangeMin = null;
+        RangeMax = null;
+        LengthMin = null;
+        LengthMax = null;
+        DateMin = null;
+        DateMax = null;
+        EnumValues = "";
+        
+        ShowRuleEditor = true;
+    }
+
+    private void EditRule(ValidationRule rule)
+    {
+        EditingRule = rule;
+        RuleName = rule.Name;
+        RuleField = rule.Field;
+        RuleType = rule.RuleType;
+        RuleExpression = rule.Expression;
+        ErrorMessage = rule.ErrorMessage;
+        Severity = rule.Severity;
+        IsEnabled = rule.IsEnabled;
+        
+        // Parse expressions for specific rule types
+        if (RuleType == "range" && !string.IsNullOrEmpty(rule.Expression))
+        {
+            var parts = rule.Expression.Split(',');
+            if (parts.Length == 2)
+            {
+                int.TryParse(parts[0], out var min);
+                int.TryParse(parts[1], out var max);
+                RangeMin = min;
+                RangeMax = max;
+            }
+        }
+        else if (RuleType == "length" && !string.IsNullOrEmpty(rule.Expression))
+        {
+            var parts = rule.Expression.Split(',');
+            if (parts.Length == 2)
+            {
+                int.TryParse(parts[0], out var min);
+                int.TryParse(parts[1], out var max);
+                LengthMin = min;
+                LengthMax = max;
+            }
+        }
+        else if (RuleType == "date" && !string.IsNullOrEmpty(rule.Expression))
+        {
+            var parts = rule.Expression.Split(',');
+            if (parts.Length == 2)
+            {
+                if (!string.IsNullOrEmpty(parts[0]) && DateTime.TryParse(parts[0], out var min))
+                {
+                    DateMin = min;
+                }
+                if (!string.IsNullOrEmpty(parts[1]) && DateTime.TryParse(parts[1], out var max))
+                {
+                    DateMax = max;
+                }
+            }
+        }
+        else if (RuleType == "enum")
+        {
+            EnumValues = rule.Expression;
+        }
+        
+        ShowRuleEditor = true;
+    }
+
+    private void CloseRuleEditor()
+    {
+        ShowRuleEditor = false;
+    }
+
+    private async Task SaveRule()
+    {
+        if (string.IsNullOrWhiteSpace(RuleName) || string.IsNullOrWhiteSpace(RuleField))
+        {
+            // Validation error
+            return;
+        }
+        
+        // Build the expression based on rule type
+        string expression = RuleType switch
+        {
+            "required" => "required",
+            "email" => "email",
+            "range" => $"{RangeMin},{RangeMax}",
+            "length" => $"{LengthMin},{LengthMax}",
+            "date" => $"{(DateMin.HasValue ? DateMin.Value.ToString("yyyy-MM-dd") : "")},{(DateMax.HasValue ? DateMax.Value.ToString("yyyy-MM-dd") : "")}",
+            "enum" => EnumValues,
+            _ => RuleExpression
+        };
+        
+        // Generate default error message if not provided
+        if (string.IsNullOrWhiteSpace(ErrorMessage))
+        {
+            ErrorMessage = RuleType switch
+            {
+                "required" => $"{RuleField} is required.",
+                "regex" => $"{RuleField} has an invalid format.",
+                "range" => $"{RuleField} must be between {RangeMin} and {RangeMax}.",
+                "length" => $"{RuleField} length must be between {LengthMin} and {LengthMax} characters.",
+                "email" => $"{RuleField} must be a valid email address.",
+                "date" => $"{RuleField} must be a valid date.",
+                "enum" => $"{RuleField} must be one of the allowed values.",
+                _ => $"{RuleField} validation failed."
+            };
+        }
+        
+        var rule = EditingRule ?? new ValidationRule
+        {
+            Id = Guid.NewGuid()
+        };
+        
+        rule.Name = RuleName;
+        rule.Field = RuleField;
+        rule.RuleType = RuleType;
+        rule.Expression = expression;
+        rule.ErrorMessage = ErrorMessage;
+        rule.Severity = Severity;
+        rule.IsEnabled = IsEnabled;
+        
+        if (EditingRule == null)
+        {
+            Mapping.ValidationRules.Add(rule);
+        }
+        
+        await MappingService.UpdateMappingAsync(Mapping);
+        await LoadData();
+        
+        ShowRuleEditor = false;
+    }
+
+    private void DeleteRule(ValidationRule rule)
+    {
+        RuleToDelete = rule;
+        ShowDeleteConfirmation = true;
+    }
+
+    private void CancelDelete()
+    {
+        ShowDeleteConfirmation = false;
+        RuleToDelete = null;
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (RuleToDelete != null)
+        {
+            Mapping.ValidationRules.Remove(RuleToDelete);
+            await MappingService.UpdateMappingAsync(Mapping);
+            await LoadData();
+        }
+        
+        ShowDeleteConfirmation = false;
+        RuleToDelete = null;
+    }
+
+    private async Task ToggleRuleEnabled(ValidationRule rule)
+    {
+        rule.IsEnabled = !rule.IsEnabled;
+        await MappingService.UpdateMappingAsync(Mapping);
+        await LoadData();
+    }
+
+    private string GetRuleTypeDisplayName(string ruleType)
+    {
+        return ruleType switch
+        {
+            "required" => "Required",
+            "regex" => "Regex Pattern",
+            "range" => "Numeric Range",
+            "length" => "Text Length",
+            "email" => "Email Format",
+            "date" => "Date Validation",
+            "enum" => "Value List",
+            "custom" => "Custom Expression",
+            _ => ruleType
+        };
+    }
+
+    private string GetSeverityBadgeClass(ValidationSeverity severity)
+    {
+        return severity switch
+        {
+            ValidationSeverity.Error => "badge bg-danger",
+            ValidationSeverity.Warning => "badge bg-warning text-dark",
+            ValidationSeverity.Info => "badge bg-info text-dark",
+            _ => "badge bg-secondary"
+        };
+    }
+} 

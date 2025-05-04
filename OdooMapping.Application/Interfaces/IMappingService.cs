@@ -1,4 +1,5 @@
 using OdooMapping.Domain.Models;
+using System;
 using System.Threading.Tasks;
 
 namespace OdooMapping.Application.Interfaces
@@ -11,7 +12,7 @@ namespace OdooMapping.Application.Interfaces
         /// <summary>
         /// Executes a mapping operation from source to target database
         /// </summary>
-        Task<MappingResult> ExecuteMappingAsync(int mappingId);
+        Task<MappingResult> ExecuteMappingAsync(Guid mappingId);
         
         /// <summary>
         /// Executes a mapping operation from source to target database
@@ -21,7 +22,7 @@ namespace OdooMapping.Application.Interfaces
         /// <summary>
         /// Validates a mapping definition for errors or inconsistencies
         /// </summary>
-        Task<ValidationResult> ValidateMappingAsync(int mappingId);
+        Task<ValidationResult> ValidateMappingAsync(Guid mappingId);
         
         /// <summary>
         /// Validates a mapping definition for errors or inconsistencies

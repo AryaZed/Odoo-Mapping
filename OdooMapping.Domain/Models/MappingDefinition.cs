@@ -8,12 +8,12 @@ namespace OdooMapping.Domain.Models
     /// </summary>
     public class MappingDefinition
     {
-        public int Id { get; set; }
+        public Guid Id { get; set; } = Guid.NewGuid();
         public string Name { get; set; }
         public string Description { get; set; }
-        public bool IsActive { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime? LastExecuted { get; set; }
+        public DateTime CreatedAt { get; set; } = DateTime.Now;
+        public DateTime LastExecutedAt { get; set; }
+        public bool IsActive { get; set; } = true;
         
         // Source configuration
         public string SourceConnectionString { get; set; }
@@ -30,9 +30,17 @@ namespace OdooMapping.Domain.Models
         // Collection of field mappings
         public List<FieldMapping> FieldMappings { get; set; } = new List<FieldMapping>();
         
+        // Validation rules
+        public List<ValidationRule> ValidationRules { get; set; } = new List<ValidationRule>();
+        
+        // Scheduling information
+        public bool IsScheduled { get; set; }
+        public string Schedule { get; set; }
+        public DateTime? NextScheduledRun { get; set; }
+        
         // Tracking information
         public string LastExecutionLog { get; set; }
         public int LastRecordCount { get; set; }
         public bool LastExecutionSuccessful { get; set; }
     }
-} 
+}
